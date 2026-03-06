@@ -1,21 +1,17 @@
 import argparse
 import logging
+import os
 import sys
 from pathlib import Path
 from typing import Optional
 
 from PIL import Image, UnidentifiedImageError
-from rembg import remove
-
-# --- SECURITY & CONFIGURATION CONSTANTS ---
-# Prevent Decompression Bombs (DoS attacks via massive images)
-Image.MAX_IMAGE_PIXELS = 89_478_485  # Approx. 90 megapixels limit
-
-# Limit maximum file size (e.g., 20 MB) to prevent memory exhaustion
-MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024
-
-# Allowed output formats
-ALLOWED_EXTENSIONS = {'.png', '.jpg', '.jpeg'}
+from bg_remover.core import (
+    ALLOWED_EXTENSIONS,
+    MAX_FILE_SIZE_BYTES,
+    remove_bg_from_stream,
+    verify_image_signature
+)
 
 def setup_logging(verbose: bool) -> logging.Logger:
     """Configures the logging level and format."""
@@ -29,16 +25,13 @@ def setup_logging(verbose: bool) -> logging.Logger:
 
 def is_safe_file(file_path: Path, input_dir: Path, logger: logging.Logger) -> bool:
     """Performs security checks on the file before processing."""
-    # 1. Check if it's a symlink to prevent reading outside intended directories
     if file_path.is_symlink():
         logger.warning(f"Skipping symlink: {file_path.name}")
         return False
     
-    # 2. Check path traversal (ensure file is actually inside input_dir)
     try:
         resolved_path = file_path.resolve(strict=True)
         resolved_input = input_dir.resolve(strict=True)
-        # Fix: Use is_relative_to for robust containment check (avoids prefix match bypass)
         if not resolved_path.is_relative_to(resolved_input):
             logger.warning(f"Path traversal attempt detected: {file_path.name}")
             return False
@@ -46,12 +39,10 @@ def is_safe_file(file_path: Path, input_dir: Path, logger: logging.Logger) -> bo
         logger.debug(f"Path resolution error for {file_path.name}: {e}")
         return False
 
-    # 3. Check file size
     if file_path.stat().st_size > MAX_FILE_SIZE_BYTES:
         logger.warning(f"File too large, skipping: {file_path.name}")
         return False
 
-    # 4. Check basic extension (further validation is done by PIL)
     if file_path.suffix.lower() not in ALLOWED_EXTENSIONS:
         return False
 
@@ -62,25 +53,18 @@ def process_images(input_dir_str: str, output_dir_str: str, logger: logging.Logg
     input_dir = Path(input_dir_str)
     output_dir = Path(output_dir_str)
 
-    # Validate input directory
     if not input_dir.is_dir():
         logger.error(f"Input directory does not exist or is not a directory: {input_dir}")
         sys.exit(1)
 
-    # Securely create output directory if it doesn't exist
     output_dir.mkdir(parents=True, exist_ok=True)
-
     logger.info("Initializing local AI model. Note: First run will download the model (~170MB).")
 
     processed_count = 0
     error_count = 0
 
-    # Iterate through files securely
     for file_path in input_dir.iterdir():
-        if not file_path.is_file():
-            continue
-
-        if not is_safe_file(file_path, input_dir, logger):
+        if not file_path.is_file() or not is_safe_file(file_path, input_dir, logger):
             continue
 
         output_filename = f"{file_path.stem}.png"
@@ -89,21 +73,28 @@ def process_images(input_dir_str: str, output_dir_str: str, logger: logging.Logg
         logger.info(f"Processing: {file_path.name} -> {output_filename}")
 
         try:
-            # Use context manager to ensure file descriptors are securely closed
-            with Image.open(file_path) as input_image:
-                # remove() returns a new PIL Image
-                output_image = remove(input_image)
+            with open(file_path, "rb") as f:
+                import io
+                input_stream = io.BytesIO(f.read())
                 
-                # Save as PNG to preserve alpha channel (transparency)
-                output_image.save(output_path, format="PNG")
+                # Security: Magic byte validation
+                if not verify_image_signature(input_stream):
+                    logger.warning(f"File signature mismatch, skipping: {file_path.name}")
+                    error_count += 1
+                    continue
+                
+                output_stream = remove_bg_from_stream(input_stream)
+                
+                # Save processed image
+                with open(output_path, "wb") as out_f:
+                    out_f.write(output_stream.getbuffer())
+                
                 processed_count += 1
                 
         except UnidentifiedImageError:
             logger.warning(f"File is not a valid image or is corrupted: {file_path.name}")
             error_count += 1
         except Exception as e:
-            # Catching general exceptions but logging securely to avoid info leakage.
-            # Detailed trace is only available in debug mode.
             logger.error(f"Failed to process {file_path.name}. Set --verbose for details.")
             logger.debug(f"Full error while processing {file_path.name}: {e}", exc_info=True)
             error_count += 1
@@ -112,33 +103,62 @@ def process_images(input_dir_str: str, output_dir_str: str, logger: logging.Logg
     logger.info(f"Task Completed! Successfully processed: {processed_count}, Errors: {error_count}")
     logger.info(f"Output saved to: {output_dir.resolve()}")
 
+def run_server(host: str, port: int, verbose: bool):
+    """Starts the FastAPI server."""
+    import uvicorn
+    # Use the absolute import path for uvicorn
+    uvicorn.run("bg_remover.api.routes:app", host=host, port=port, reload=False, log_level="debug" if verbose else "info")
+
 def main() -> None:
+    # Environment-based mode switching (convenient for Docker)
+    if os.getenv("BG_REMOVER_MODE") == "server":
+        port = int(os.getenv("PORT", 8000))
+        verbose = os.getenv("VERBOSE", "false").lower() == "true"
+        run_server("0.0.0.0", port, verbose)
+        return
+
     parser = argparse.ArgumentParser(
-        description="Batch background removal tool using local AI.",
+        description="Secure local AI tool for batch background removal.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
-    parser.add_argument(
+    
+    subparsers = parser.add_subparsers(dest="command", required=True, help="Modes of operation")
+    
+    # CLI Mode Subparser
+    cli_parser = subparsers.add_parser("cli", help="Batch process local images")
+    cli_parser.add_argument(
         "-i", "--input", 
         type=str, 
         default="input_frames",
         help="Path to the directory containing input images."
     )
-    parser.add_argument(
+    cli_parser.add_argument(
         "-o", "--output", 
         type=str, 
         default="frames",
         help="Path to the directory where transparent PNGs will be saved."
     )
-    parser.add_argument(
+    cli_parser.add_argument(
         "-v", "--verbose", 
         action="store_true", 
         help="Enable verbose/debug logging."
     )
 
-    args = parser.parse_args()
-    logger = setup_logging(args.verbose)
+    # Server Mode Subparser
+    server_parser = subparsers.add_parser("server", help="Start the REST API server")
+    server_parser.add_argument("--host", type=str, default="0.0.0.0", help="Host to bind")
+    server_parser.add_argument("--port", type=int, default=8000, help="Port to bind")
+    server_parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose logging")
 
-    process_images(args.input, args.output, logger)
+    args = parser.parse_args()
+
+    # Routing
+    if args.command == "server":
+        setup_logging(args.verbose)
+        run_server(args.host, args.port, args.verbose)
+    elif args.command == "cli":
+        logger = setup_logging(args.verbose)
+        process_images(args.input, args.output, logger)
 
 if __name__ == "__main__":
     main()

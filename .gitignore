@@ -22,3 +22,6 @@ frames/
 # Temporary split directories
 ezgif-*
 *-png-split/
+
+# Local progress tracking
+PLAN.md

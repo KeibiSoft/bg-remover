@@ -1,0 +1,31 @@
+services:
+  bg-remover:
+    build: .
+    ports:
+      - "${PORT:-8000}:${PORT:-8000}"
+    environment:
+      - BG_REMOVER_API_KEY=${BG_REMOVER_API_KEY:-}
+      - PORT=${PORT:-8000}
+    # Security Hardening
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp
+      - /home/appuser/.u2net:uid=1000,gid=1000
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${PORT:-8000}/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped

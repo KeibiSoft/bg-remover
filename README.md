@@ -39,17 +39,41 @@ This project requires **Python 3.12+** and is optimized for [uv](https://github.
         uv sync --extra gpu
         ```
 
+3.  **For Development & Testing:**
+    Install additional tools for running tests:
+    ```bash
+    uv sync --extra test --extra cpu
+    ```
+
+4.  **For API Server Deployment:**
+    Install dependencies for the REST API:
+    ```bash
+    uv sync --extra server --extra cpu
+    ```
+
+## 🧪 Testing
+
+This project follows a Test-Driven Development (TDD) approach. To run the test suite:
+```bash
+uv run pytest
+```
+
 3.  **Locking:** `uv` handles locking automatically via `uv.lock`, ensuring reproducible and secure builds.
 
 ## 📖 Usage
 
 The tool follows a **Source Layout** (`src/`) for clean builds. You can run it directly using `uv run`.
 
-### Basic Command
+### CLI Mode (Batch Processing)
 Place your images in a folder named `input_frames` (created automatically if missing) and run:
 ```bash
 uv run bg-remover
+```
 
+### Server Mode (REST API) - *Coming Soon*
+Once Phase 2 is complete, you will be able to start the secure FastAPI server:
+```bash
+uv run bg-remover server
 ```
 
 ### Advanced Arguments
