@@ -18,3 +18,7 @@ frames/
 .uv/
 .env
 .DS_Store
+
+# Temporary split directories
+ezgif-*
+*-png-split/

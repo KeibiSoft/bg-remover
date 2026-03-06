@@ -38,7 +38,8 @@ def is_safe_file(file_path: Path, input_dir: Path, logger: logging.Logger) -> bo
     try:
         resolved_path = file_path.resolve(strict=True)
         resolved_input = input_dir.resolve(strict=True)
-        if not str(resolved_path).startswith(str(resolved_input)):
+        # Fix: Use is_relative_to for robust containment check (avoids prefix match bypass)
+        if not resolved_path.is_relative_to(resolved_input):
             logger.warning(f"Path traversal attempt detected: {file_path.name}")
             return False
     except Exception as e:
@@ -101,9 +102,10 @@ def process_images(input_dir_str: str, output_dir_str: str, logger: logging.Logg
             logger.warning(f"File is not a valid image or is corrupted: {file_path.name}")
             error_count += 1
         except Exception as e:
-            # Catching general exceptions but logging securely without exposing stack traces to end users 
-            # unless in debug mode.
-            logger.error(f"Failed to process {file_path.name}: {e}")
+            # Catching general exceptions but logging securely to avoid info leakage.
+            # Detailed trace is only available in debug mode.
+            logger.error(f"Failed to process {file_path.name}. Set --verbose for details.")
+            logger.debug(f"Full error while processing {file_path.name}: {e}", exc_info=True)
             error_count += 1
 
     logger.info("========================================")

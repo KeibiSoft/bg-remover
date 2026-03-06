@@ -31,18 +31,15 @@ This project requires **Python 3.12+** and is optimized for [uv](https://github.
 
     * **For CPU (Standard Laptops, Mac M1/M2/M3, etc.):**
         ```bash
-        uv pip install ".[cpu]"
+        uv sync --extra cpu
         ```
 
     * **For NVIDIA GPU (Requires CUDA installed):**
         ```bash
-        uv pip install ".[gpu]"
+        uv sync --extra gpu
         ```
 
-3.  **Lock dependencies (Security Best Practice):**
-    ```bash
-    uv lock
-    ```
+3.  **Locking:** `uv` handles locking automatically via `uv.lock`, ensuring reproducible and secure builds.
 
 ## 📖 Usage
 
