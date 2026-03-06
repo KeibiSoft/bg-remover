@@ -25,6 +25,17 @@ def test_api_rejects_non_image():
     assert response.status_code == 400
     assert "Invalid image" in response.json()["detail"]
 
+def test_api_rejects_large_file():
+    from bg_remover.core import MAX_FILE_SIZE_BYTES
+    # Create a large dummy content
+    large_content = b"a" * (MAX_FILE_SIZE_BYTES + 1)
+    response = client.post(
+        "/remove", 
+        files={"file": ("large.png", large_content, "image/png")}
+    )
+    assert response.status_code == 413
+    assert "File too large" in response.json()["detail"]
+
 def test_health_check():
     response = client.get("/health")
     assert response.status_code == 200

@@ -1,7 +1,12 @@
 import io
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, UploadFile, File, HTTPException, Response, Depends, Request
-from bg_remover.core import remove_bg_from_stream, verify_image_signature, get_bg_session
+from bg_remover.core import (
+    remove_bg_from_stream, 
+    verify_image_signature, 
+    get_bg_session,
+    MAX_FILE_SIZE_BYTES
+)
 from PIL import UnidentifiedImageError
 from bg_remover.api.security import get_api_key, limiter
 from slowapi.errors import RateLimitExceeded
@@ -35,8 +40,18 @@ async def remove_background(
     file: UploadFile = File(...),
     api_key: str = Depends(get_api_key)
 ):
+    # Security: Check Content-Length header if available
+    content_length = request.headers.get("content-length")
+    if content_length and int(content_length) > MAX_FILE_SIZE_BYTES:
+        raise HTTPException(status_code=413, detail="File too large.")
+
     # Read file into memory
     content = await file.read()
+    
+    # Double check actual size in memory
+    if len(content) > MAX_FILE_SIZE_BYTES:
+        raise HTTPException(status_code=413, detail="File too large.")
+        
     input_stream = io.BytesIO(content)
     
     # Security: Verify magic bytes
