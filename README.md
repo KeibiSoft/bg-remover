@@ -1,19 +1,25 @@
-# ✂️ AI Background Remover (Local & Secure)
+# ✂️ AI Background Remover (Secure AI Artifact)
 
-A production-ready CLI tool built with Python to batch-remove backgrounds from images using local AI models. Designed for privacy, speed, and security.
+[![Maintained by KeibiSoft](https://img.shields.io/badge/Maintained%20by-KeibiSoft-blue?style=for-the-badge)](https://keibisoft.com)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
+[![Security: Hardened](https://img.shields.io/badge/Security-Hardened-success?style=for-the-badge)](#🛡️-security-audit)
 
-Unlike cloud-based alternatives, this tool runs **entirely on your machine**. No data is uploaded to third-party servers, ensuring your images remain private and secure.
+A production-ready CLI tool and REST API built with Python to batch-remove backgrounds from images using local AI models. 
+
+**This repository is a KeibiSoft Security Artifact.** It serves as a reference implementation for secure, local-first AI services, demonstrating how to integrate high-performance inference with strict SSDLC standards.
+
+Unlike cloud-based alternatives, this tool runs **entirely on your machine**. No data is uploaded to third-party servers, ensuring absolute privacy and data sovereignty.
 
 ## ✨ Key Features
 
-* **100% Local Processing**: Privacy-first approach; works offline after the initial model download.
-* **Hardware Flexible**: Optimized for both CPU-only systems (Laptops/Macs) and NVIDIA GPU acceleration.
-* **Security Hardened**: 
-    * **Path Traversal Protection**: Prevents unauthorized file access outside designated folders.
-    * **DoS Protection**: Enforces strict pixel and file size limits to prevent "Decompression Bomb" attacks.
-    * **Symlink Safety**: Explicitly ignores symbolic links to avoid accidental system file exposure.
-* **Modern Python Stack**: Powered by `uv` for lightning-fast, hashed, and reproducible dependency management.
-* **Production Logging**: Professional logging instead of simple print statements for better auditing.
+*   **Dual-Mode Operation**: Use it as a one-off **CLI tool** for batch processing or a persistent **REST API** service.
+*   **100% Local Processing**: Privacy-first approach; works offline after the initial model download.
+*   **Hardware Flexible**: Optimized for both CPU-only systems and NVIDIA GPU acceleration.
+*   **Security Hardened**: 
+    *   **Path Traversal Protection**: Prevents unauthorized file access.
+    *   **DoS Protection**: Enforces strict pixel, file size, and rate limits.
+    *   **Magic Byte Validation**: Verifies file integrity (PNG/JPEG) before processing.
+*   **Docker Ready**: Includes a hardened, non-root, multi-stage Docker configuration.
 
 ## 🚀 Installation
 
@@ -21,93 +27,66 @@ This project requires **Python 3.12+** and is optimized for [uv](https://github.
 
 1.  **Clone the repository:**
     ```bash
-    git clone [https://github.com/ac999/bg-remover](https://github.com/ac999/bg-remover)
+    git clone https://github.com/ac999/bg-remover
     cd bg-remover
     ```
 
-2.  **Initialize the environment and install dependencies:**
-
-    Choose the command based on your hardware:
-
-    * **For CPU (Standard Laptops, Mac M1/M2/M3, etc.):**
-        ```bash
-        uv sync --extra cpu
-        ```
-
-    * **For NVIDIA GPU (Requires CUDA installed):**
-        ```bash
-        uv sync --extra gpu
-        ```
-
-3.  **For Development & Testing:**
-    Install additional tools for running tests:
+2.  **Initialize the environment:**
     ```bash
-    uv sync --extra test --extra cpu
+    # For CPU usage
+    uv sync --extra cpu
+    
+    # For NVIDIA GPU (Requires CUDA)
+    uv sync --extra gpu
+    
+    # For API Server + Testing
+    uv sync --extra server --extra test --extra cpu
     ```
 
-4.  **For API Server Deployment:**
-    Install dependencies for the REST API:
-    ```bash
-    uv sync --extra server --extra cpu
-    ```
+## 📖 Usage
+
+### CLI Mode (Batch Processing)
+Place your images in a folder (default: `input_frames`) and run:
+```bash
+uv run bg-remover cli
+```
+
+**Options:**
+*   `-i, --input`: Input directory.
+*   `-o, --output`: Output directory.
+*   `-v, --verbose`: Enable debug logs.
+
+### Server Mode (REST API)
+Start the high-performance FastAPI server:
+```bash
+uv run bg-remover server
+```
+The API will be available at `http://localhost:8000`. View automatic documentation at `/docs`.
+
+**Security Configuration:**
+Copy `.env.example` to `.env` and set `BG_REMOVER_API_KEY` to secure your endpoint.
+
+## 🐳 Docker Deployment
+
+The fastest way to deploy the service on a VPS:
+```bash
+docker-compose up -d
+```
+The Docker image is hardened with a read-only root filesystem and restricted kernel capabilities.
 
 ## 🧪 Testing
 
-This project follows a Test-Driven Development (TDD) approach. To run the test suite:
+This project follows a Test-Driven Development (TDD) approach.
 ```bash
 uv run pytest
 ```
 
-3.  **Locking:** `uv` handles locking automatically via `uv.lock`, ensuring reproducible and secure builds.
+## 🛡️ Security Audit
 
-## 📖 Usage
-
-The tool follows a **Source Layout** (`src/`) for clean builds. You can run it directly using `uv run`.
-
-### CLI Mode (Batch Processing)
-Place your images in a folder named `input_frames` (created automatically if missing) and run:
-```bash
-uv run bg-remover
-```
-
-### Server Mode (REST API) - *Coming Soon*
-Once Phase 2 is complete, you will be able to start the secure FastAPI server:
-```bash
-uv run bg-remover server
-```
-
-### Advanced Arguments
-
-You can customize the directories and verbosity:
-
-```bash
-uv run bg-remover --input ./my_photos --output ./processed_results --verbose
-
-```
-
-**Options:**
-
-* `-i, --input`: Directory containing source images (Default: `input_frames`).
-* `-o, --output`: Directory for transparent PNGs (Default: `frames`).
-* `-v, --verbose`: Enables detailed debug logs.
-
-## 🛡️ Security Audit & Best Practices
-
-This tool implements several "expert-level" security measures:
-
-* **Resource Limits**: `Pillow` is configured with `MAX_IMAGE_PIXELS` to prevent memory exhaustion from malicious images.
-* **File Validation**: Files are validated by content (magic bytes) through the `Pillow` engine, not just by extension.
-* **Hashed Dependencies**: Using `uv.lock` ensures that every package installed matches the exact cryptographic hash recorded, preventing supply-chain attacks.
-* **Isolated Builds**: The `src/` layout prevents the build system from accidentally bundling your private data folders (`input_frames`, `frames`) into the distribution.
-
-## 🤖 AI Model Information
-
-On the **first run**, the script will automatically download the `u2net` model (approx. 170MB) from the official `rembg` source.
-
-* **Storage Location**: The model is saved in `~/.u2net/`.
-* **Integrity**: The model is managed by the `onnxruntime` backend for secure execution.
+*   **Resource Limits**: `MAX_IMAGE_PIXELS` and `MAX_FILE_SIZE_BYTES` are strictly enforced.
+*   **API Security**: Built-in IP-based rate limiting and optional API Key authentication.
+*   **Privacy**: API mode processes images strictly in-memory (`BytesIO`); no files are written to the server's disk.
 
 ## 📜 License
 
 Distributed under the MIT License. See `LICENSE` for more information.
-

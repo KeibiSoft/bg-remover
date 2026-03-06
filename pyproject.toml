@@ -6,9 +6,10 @@ readme = "README.md"
 requires-python = ">=3.12"
 license = "MIT"
 authors = [
-    { name = "Andrei Cristian", email = "andrei@keibisoft.com" }
+    { name = "KeibiSoft", email = "andrei@keibisoft.com" }
 ]
-keywords = ["ai", "background-removal", "rembg", "cli"]
+keywords = ["ai", "background-removal", "rembg", "cli", "security", "privacy", "fastapi"]
+urls = { "Homepage" = "https://keibisoft.com", "Repository" = "https://github.com/KeibiSoft/bg-remover" }
 classifiers = [
     "Programming Language :: Python :: 3.12",
     "Operating System :: OS Independent",
