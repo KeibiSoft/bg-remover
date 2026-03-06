@@ -68,11 +68,32 @@ Copy `.env.example` to `.env` and set `BG_REMOVER_API_KEY` to secure your endpoi
 
 ## 🐳 Docker Deployment
 
-The fastest way to deploy the service on a VPS:
+This service is optimized for secure VPS deployment using Docker. The image is hardened with a **read-only root filesystem**, **non-root user**, and **dropped kernel capabilities**.
+
+### 1. Configure Environment
+Copy the example environment file and set your API key:
 ```bash
-docker-compose up -d
+cp .env.example .env
+# Edit .env to set your BG_REMOVER_API_KEY
 ```
-The Docker image is hardened with a read-only root filesystem and restricted kernel capabilities.
+
+### 2. Start the Service
+Deploy using Docker Compose:
+```bash
+# Build and start in detached mode
+docker-compose up -d --build
+```
+
+The server will automatically:
+*   Bake the AI model into the image during the build stage.
+*   Bind to the port specified in your `.env` (default: `8000`).
+*   Run under a low-privilege `appuser`.
+
+### 3. Verify Deployment
+Check the health status:
+```bash
+curl http://localhost:8000/health
+```
 
 ## 🧪 Testing
 
